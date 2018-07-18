@@ -6,7 +6,7 @@ import utils
 from video_reader import VideoReader
 
 
-def nothing(pos):
+def nothing(_):
     return
 
 class Nematoda:
@@ -21,12 +21,13 @@ class Nematoda:
         display_scale=1.0,
     ):
         self.frame_step = frame_step
+        self.resize_ratio = resize_ratio
         self.video_reader = VideoReader(filename, resize_ratio, frame_step)
         self.background_subtractor = None
         self.movement_threshold = movement_threshold
         self.kernel_size = kernel_size
         if self.kernel_size is None:
-            self.kernel_size = int(min(self.video_reader.target_shape)/ 32)
+            self.kernel_size = int(min(self.video_reader.target_shape) / 32)
             self.kernel_size = int(2 * (int((self.kernel_size - 1) / 2))) + 1
 
         self.max_nematoda_count = max_nematoda_count
@@ -35,7 +36,6 @@ class Nematoda:
             int(self.video_reader.target_shape[0] * display_scale),
             int(self.video_reader.target_shape[1] * display_scale),
         )
-
 
     def initialize_background_subtractor(self):
         self.background_subtractor = cv2.createBackgroundSubtractorMOG2(history=10)
@@ -59,10 +59,11 @@ class Nematoda:
         frame_d = cv2.resize(frame, self.display_size_target)
         labeled_frame_d = cv2.resize(frame, self.display_size_target)
         cv2.imshow('video', np.hstack([frame_d, labeled_frame_d]))
-        cv2.createTrackbar('movement_threshold', 'video', self.movement_threshold, 63, nothing)
-        cv2.createTrackbar('kernel_size', 'video', self.kernel_size, self.kernel_size * 3, nothing)
-        cv2.createTrackbar('frame_step', 'video', self.frame_step, int(self.video_reader.frame_count/20-1), nothing)
-        cv2.setTrackbarMin('frame_step', 'video', 1)
+        cv2.createTrackbar('threshold', 'video', self.movement_threshold, 63, nothing)
+        cv2.createTrackbar('kernelSize', 'video', self.kernel_size, self.kernel_size * 3, nothing)
+        cv2.createTrackbar('frameStep', 'video', self.frame_step, int(self.video_reader.frame_count/20-1), nothing)
+        cv2.setTrackbarMin('frameStep', 'video', 1)
+        reset_frame_step_countdown = -1
         while True:
             contours = self.get_contours(frame)
             labeled_frame = frame.copy()
@@ -71,14 +72,20 @@ class Nematoda:
             labeled_frame_d = cv2.resize(labeled_frame, self.display_size_target)
             cv2.imshow('video', np.hstack([frame_d, labeled_frame_d]))
 
-            self.movement_threshold = cv2.getTrackbarPos('movement_threshold', 'video')
-            self.kernel_size = cv2.getTrackbarPos('kernel_size', 'video')
+            self.movement_threshold = cv2.getTrackbarPos('threshold', 'video')
+            self.kernel_size = cv2.getTrackbarPos('kernelSize', 'video')
             self.kernel_size = int(2 * (int((self.kernel_size - 1) / 2))) + 1
-            if self.frame_step != cv2.getTrackbarPos('frame_step', 'video'):
-                self.frame_step = cv2.getTrackbarPos('frame_step', 'video')
+            if self.frame_step != cv2.getTrackbarPos('frameStep', 'video'):
+                self.frame_step = cv2.getTrackbarPos('frameStep', 'video')
+                reset_frame_step_countdown = 20
+
+            if reset_frame_step_countdown > 0:
+                reset_frame_step_countdown -= 1
+            if reset_frame_step_countdown == 0:
                 self.video_reader.reset(frame_step=self.frame_step)
                 self.initialize_background_subtractor()
                 frame = self.video_reader.read()
+                reset_frame_step_countdown = -1
 
             k = cv2.waitKey(30) & 0xff
 
@@ -164,4 +171,3 @@ if __name__ == '__main__':
             online=True,
             output_filename=os.path.join(os.path.join(root_dir, 'output'), file)
         )
-
