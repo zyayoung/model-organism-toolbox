@@ -1,6 +1,7 @@
 import os
 import glob
 from nematoda import Nematoda
+import sys
 
 if __name__ == '__main__':
     if not os.path.exists('results.csv'):
@@ -20,19 +21,24 @@ if __name__ == '__main__':
             )
             nematoda.config()
 
-            results = open('results.csv', 'a')
-            nematoda_cnt = nematoda.process(
-                online=True,
-                output_filename=os.path.join(os.path.join(root_dir, 'output'), file)
-            )
-            results.write('%s,%s,%f,%d,%d,%d\n' % (
-                file,
-                nematoda_cnt,
-                nematoda.resize_ratio,
-                nematoda.movement_threshold,
-                nematoda.kernel_size,
-                nematoda.frame_step,
-            ))
-            results.close()
-    except InterruptedError:
-        print('bye')
+        nematoda_cnt = nematoda.process(
+            online=True,
+            output_filename=os.path.join(os.path.join(root_dir, 'output'), file)
+        )
+
+        # write csv file
+        if not os.path.exists(os.path.join(os.path.join(root_dir, 'output/results.csv'))):
+            f = open(os.path.join(os.path.join(root_dir, 'output/results.csv')), 'w')
+            f.write('filename,result,resizeRatio,threshold,kernelSize,frameStep\n')
+            f.close()
+        f = open(os.path.join(os.path.join(root_dir, 'output/results.csv')), 'a')
+        f.write('%s,%s,%f,%d,%d,%d\n' % (
+            file,
+            nematoda_cnt,
+            nematoda.resize_ratio,
+            nematoda.movement_threshold,
+            nematoda.kernel_size,
+            nematoda.frame_step,
+        ))
+        f.close()
+os.system('PAUSE')

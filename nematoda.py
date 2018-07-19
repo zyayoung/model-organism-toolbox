@@ -9,7 +9,9 @@ from video_reader import VideoReader
 def nothing(_):
     return
 
+
 class Nematoda:
+    # Todo: Add some comments
     def __init__(
         self,
         filename=r'D:\Projects\model_organism_helper\Nematoda\capture-0001.avi',
@@ -32,6 +34,7 @@ class Nematoda:
 
         self.max_nematoda_count = max_nematoda_count
         self.initialize_background_subtractor()
+        display_scale = min(display_scale, 400/np.min(self.video_reader.target_shape))
         self.display_size_target = (
             int(self.video_reader.target_shape[0] * display_scale),
             int(self.video_reader.target_shape[1] * display_scale),
@@ -124,6 +127,15 @@ class Nematoda:
 
             if online or wri is not None:
                 labeled_frame = frame.copy()
+                cv2.putText(
+                    labeled_frame,
+                    '%d' % (len(contours),),
+                    (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    2,
+                    utils.COLOR['yellow'],
+                    6
+                )
                 if contours:
                     cv2.drawContours(labeled_frame, contours, -1, utils.COLOR['red'], 2, cv2.LINE_AA)
                 if wri is not None:
