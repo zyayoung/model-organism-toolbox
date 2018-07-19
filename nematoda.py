@@ -108,12 +108,12 @@ class Nematoda:
             wri = cv2.VideoWriter(
                 output_filename,
                 cv2.VideoWriter_fourcc('F', 'M', 'P', '4'),
-                self.video_reader.fps / self.video_reader.frame_step,
+                self.video_reader.fps,
                 self.video_reader.target_shape,
             )
 
         _time = cv2.getTickCount()
-        history = np.zeros((self.max_nematoda_count,))
+        frame_count = np.zeros((self.max_nematoda_count,))
 
         frame = self.video_reader.read()
         frame_idx = 0
@@ -123,7 +123,7 @@ class Nematoda:
 
             if contours:
                 if len(contours) < self.max_nematoda_count:
-                    history[len(contours)] += 1
+                    frame_count[len(contours)] += 1
 
             if online or wri is not None:
                 labeled_frame = frame.copy()
@@ -162,9 +162,9 @@ class Nematoda:
             wri.release()
         if online:
             cv2.destroyAllWindows()
-            print(history)
-            print('prediction:', np.argmax(history))
-        return np.argmax(history)
+            print(frame_count)
+            print('prediction:', np.argmax(frame_count))
+        return frame_count
 
 
 if __name__ == '__main__':
