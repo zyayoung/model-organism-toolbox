@@ -19,8 +19,8 @@ if __name__ == '__main__':
             continue
         print('Now processing:', file)
         root_dir, file = os.path.split(file)
-        if not os.path.exists(root_dir + '\output'):
-            os.mkdir(root_dir + '\output')
+        if not os.path.exists(os.path.join(root_dir,'output')):
+            os.mkdir(os.path.join(root_dir,'output'))
         nematoda = Nematoda(
             os.path.join(root_dir, file),
             # Todo: config these parameters in GUI
