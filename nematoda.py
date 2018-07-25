@@ -152,10 +152,10 @@ class Nematoda:
             frame_idx += 1
 
             # progress report
-            if frame_idx % 50 == 0:
+            if frame_idx % 20 == 0:
                 print('%.2f' % (frame_idx * 100.0 / self.video_reader.frame_count) + '%', end=' ')
                 time = cv2.getTickCount()
-                print(50 / (time - _time) * cv2.getTickFrequency(), 'fps')
+                print(20 / (time - _time) * cv2.getTickFrequency(), 'fps')
                 _time = time
 
         if wri is not None:

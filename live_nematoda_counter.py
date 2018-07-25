@@ -6,13 +6,7 @@ import tkinter.filedialog
 import tkinter
 
 if __name__ == '__main__':
-    file_list = []
-    if len(sys.argv) > 1:
-        file_list = sys.argv[1:]
-    else:
-        tk = tkinter.Tk()
-        file_list = list(tkinter.filedialog.askopenfilenames())
-        tk.destroy()
+    file_list = ['videos/capture-0004.mp4']
 
     for file in file_list:
         if os.path.isdir(file):
@@ -27,10 +21,10 @@ if __name__ == '__main__':
             resize_ratio=0.5,
             display_scale=1,
         )
-        nematoda.config()
+        # nematoda.config()
 
         frame_count = nematoda.process(
-            online=True,
+            online=False,
             output_filename=os.path.join(os.path.join(root_dir, 'output'), file)
         )
 
