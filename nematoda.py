@@ -10,7 +10,7 @@ def nothing(_):
     return
 
 
-class Nematoda:
+class NematodaMovementDetector:
     # Todo: Add some comments
     def __init__(
         self,
@@ -167,19 +167,147 @@ class Nematoda:
         return frame_count
 
 
+class NematodaTracker:
+    def __init__(
+        self,
+        filename=r'videos\Nematoda\capture-0044.avi',
+        resize_ratio=0.5,
+        frame_step=1,
+    ):
+        self.frame_step = frame_step
+        self.resize_ratio = resize_ratio
+        self.video_reader = VideoReader(filename, resize_ratio, frame_step)
+        self.rect = np.array([-1]*4)
+        self.tracker = cv2.TrackerMIL_create()
+
+    def choose_window(self):
+        frame = self.video_reader.read()
+        self.rect = cv2.selectROI(frame, False)
+        print(self.rect)
+        self.tracker.init(frame, self.rect)
+        cv2.destroyAllWindows()
+
+    def track(self, output_filename):
+        wri = cv2.VideoWriter(
+            output_filename,
+            cv2.VideoWriter_fourcc('F', 'M', 'P', '4'),
+            self.video_reader.fps,
+            self.video_reader.target_shape,
+        )
+        while True:
+            frame = self.video_reader.read()
+            if frame is None:
+                break
+
+            timer = cv2.getTickCount()
+            ok, bbox = self.tracker.update(frame)
+            fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
+            if ok:
+                # Tracking success
+                p1 = (int(bbox[0]), int(bbox[1]))
+                p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
+                cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
+            else:
+                # Tracking failure
+                cv2.putText(frame, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),
+                            2)
+
+            # Display tracker type on frame
+            cv2.putText(frame, " Tracker", (100, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+            # Display FPS on frame
+            cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+            # Display result
+            cv2.imshow("Tracking", frame)
+            wri.write(frame)
+
+            # Exit if ESC pressed
+            k = cv2.waitKey(1) & 0xff
+            if k == 27:
+                break
+        wri.release()
+
+
+class NematodaOptFlow:
+    def __init__(
+        self,
+        filename=r'videos\Nematoda\capture-0056.avi',
+        resize_ratio=0.5,
+        frame_step=1,
+    ):
+        self.frame_step = frame_step
+        self.resize_ratio = resize_ratio
+        self.video_reader = VideoReader(filename, resize_ratio, frame_step)
+
+        self.p0 = []
+
+    @staticmethod
+    def on_mouse(event, x, y, flag, param):
+        if event == 4:
+            param.append((x, y))
+
+    def choose_window(self):
+        cv2.namedWindow('init')
+        cv2.setMouseCallback('init', self.on_mouse, self.p0)
+        frame = self.video_reader.read()
+        while True:
+            cv2.imshow('init', frame)
+            k = cv2.waitKey(30) & 0xff
+            if k == 27:
+                break
+        self.p0 = np.array(self.p0, dtype=np.float32).reshape(-1, 1, 2)
+        cv2.destroyAllWindows()
+
+    def track(self, output_filename):
+        wri = cv2.VideoWriter(
+            output_filename,
+            cv2.VideoWriter_fourcc('F', 'M', 'P', '4'),
+            self.video_reader.fps,
+            self.video_reader.target_shape,
+        )
+        lk_params = dict(winSize=(5, 5),
+                         maxLevel=2,
+                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+        color = np.random.randint(0, 255, (100, 3))
+        old_frame = self.video_reader.read()
+        old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+        mask = np.zeros_like(old_frame)
+
+        while True:
+            frame = self.video_reader.read()
+            if frame is None:
+                break
+            frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # 计算光流
+            p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, self.p0, None, **lk_params)
+            # 选取好的跟踪点
+            good_new = p1[st == 1]
+            good_old = self.p0[st == 1]
+
+            # 画出轨迹
+            for i, (new, old) in enumerate(zip(good_new, good_old)):
+                a, b = new.ravel()
+                c, d = old.ravel()
+                mask = cv2.line(mask, (a, b), (c, d), color[i].tolist(), 2)
+                frame = cv2.circle(frame, (a, b), 5, color[i].tolist(), -1)
+            img = cv2.add(frame, mask)
+
+            cv2.imshow('frame', img)
+            wri.write(img)
+            k = cv2.waitKey(30) & 0xff
+            if k == 27:
+                break
+
+            # 更新上一帧的图像和追踪点
+            old_gray = frame_gray.copy()
+            self.p0 = good_new.reshape(-1, 1, 2)
+
+        cv2.destroyAllWindows()
+        self.video_reader.release()
+        wri.release()
+
+
 if __name__ == '__main__':
-    root_dir = r'videos\Nematoda'
-    if not os.path.exists(root_dir+'\output'):
-        os.mkdir(root_dir+'\output')
-    for file in glob.glob(root_dir+r'\*.*'):
-        file = os.path.split(file)[1]
-        nematoda = Nematoda(
-            os.path.join(root_dir, file),
-            resize_ratio=.5,
-            display_scale=.5
-        )
-        nematoda.config()
-        nematoda.process(
-            online=True,
-            output_filename=os.path.join(os.path.join(root_dir, 'output'), file)
-        )
+    nematoda_chaser = NematodaOptFlow()
+    nematoda_chaser.choose_window()
+    nematoda_chaser.track('test.mp4')

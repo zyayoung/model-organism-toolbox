@@ -23,7 +23,12 @@ class VideoReader:
         else:
             return None
 
+    def release(self):
+        self.cap.release()
+
     def reset(self, frame_step=None):
         if frame_step:
             self.frame_step = frame_step
+        self.release()
         self.cap = cv2.VideoCapture(self.filename)
+
