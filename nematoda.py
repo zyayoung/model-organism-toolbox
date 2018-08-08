@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import cv2
 import glob
 import os
@@ -167,66 +168,6 @@ class NematodaMovementDetector:
         return frame_count
 
 
-class NematodaTracker:
-    def __init__(
-        self,
-        filename=r'videos\Nematoda\capture-0044.avi',
-        resize_ratio=0.5,
-        frame_step=1,
-    ):
-        self.frame_step = frame_step
-        self.resize_ratio = resize_ratio
-        self.video_reader = VideoReader(filename, resize_ratio, frame_step)
-        self.rect = np.array([-1]*4)
-        self.tracker = cv2.TrackerMIL_create()
-
-    def choose_window(self):
-        frame = self.video_reader.read()
-        self.rect = cv2.selectROI(frame, False)
-        print(self.rect)
-        self.tracker.init(frame, self.rect)
-        cv2.destroyAllWindows()
-
-    def track(self, output_filename):
-        wri = cv2.VideoWriter(
-            output_filename,
-            cv2.VideoWriter_fourcc('F', 'M', 'P', '4'),
-            self.video_reader.fps,
-            self.video_reader.target_shape,
-        )
-        while True:
-            frame = self.video_reader.read()
-            if frame is None:
-                break
-
-            timer = cv2.getTickCount()
-            ok, bbox = self.tracker.update(frame)
-            fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
-            if ok:
-                # Tracking success
-                p1 = (int(bbox[0]), int(bbox[1]))
-                p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
-            else:
-                # Tracking failure
-                cv2.putText(frame, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),
-                            2)
-
-            # Display tracker type on frame
-            cv2.putText(frame, " Tracker", (100, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
-            # Display FPS on frame
-            cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
-            # Display result
-            cv2.imshow("Tracking", frame)
-            wri.write(frame)
-
-            # Exit if ESC pressed
-            k = cv2.waitKey(1) & 0xff
-            if k == 27:
-                break
-        wri.release()
-
-
 class NematodaOptFlow:
     def __init__(
         self,
@@ -307,7 +248,169 @@ class NematodaOptFlow:
         wri.release()
 
 
-if __name__ == '__main__':
-    nematoda_chaser = NematodaOptFlow()
-    nematoda_chaser.choose_window()
-    nematoda_chaser.track('test.mp4')
+class NematodeTracker:
+    def __init__(self, filename='videos/capture-0001.mp4'):
+        self.filename = filename
+        self.video_reader = VideoReader(filename, resize_ratio=0.5, frame_step=1)
+        self.first_frame = self.video_reader.read()
+        self.choice = []
+        self.chosen_nematode_tot_distance = []
+        self.colors = np.random.uniform(0, 255, (100, 3))
+        self.threshold = 70
+        self.min_area = 10
+        self.max_area = 20
+
+        self.data = []
+
+    @staticmethod
+    def on_mouse(event, x, y, flag, param):
+        if event == 4:
+            param.append((x, y))
+
+    @staticmethod
+    def l2distance(param):
+        pos1, pos2 = param
+        return (pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2
+
+    @staticmethod
+    def nothing(param):
+        return
+
+    def init_threshold(self):
+        cv2.namedWindow('init threshold')
+        cv2.createTrackbar('threshold', 'init threshold', self.threshold, 255, self.nothing)
+        frame = self.first_frame
+        while True:
+            self.threshold = cv2.getTrackbarPos('threshold', 'init threshold')
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            ret, gray_frame = cv2.threshold(gray_frame, self.threshold, 255, cv2.THRESH_BINARY_INV)
+            display_frame = frame.copy()
+
+            _, contours, _ = cv2.findContours(gray_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                cv2.drawContours(display_frame, contours, -1, (0, 0, 255))
+
+            display_frame = cv2.putText(display_frame, 'Press Enter To Continue...', (50, 50),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            cv2.imshow('init threshold', display_frame)
+            k = cv2.waitKey(30) & 0xff
+            if k in [27, 13, 32]:
+                cv2.destroyAllWindows()
+                break
+
+    def choose_nematode(self):
+        cv2.namedWindow('choose nematode')
+        cv2.setMouseCallback('choose nematode', self.on_mouse, self.choice)
+        cv2.createTrackbar('minArea', 'choose nematode', self.min_area, 100, self.nothing)
+        cv2.createTrackbar('maxArea', 'choose nematode', self.max_area, 100, self.nothing)
+        frame = self.first_frame
+        while True:
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            ret, gray_frame = cv2.threshold(gray_frame, self.threshold, 255, cv2.THRESH_BINARY_INV)
+            display_frame = frame.copy()
+            centers = []
+            _, contours, _ = cv2.findContours(gray_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                self.min_area = cv2.getTrackbarPos('minArea', 'choose nematode')**2
+                self.max_area = cv2.getTrackbarPos('maxArea', 'choose nematode')**2
+                for idx, contour in enumerate(contours):
+                    if self.min_area < cv2.contourArea(contour) < self.max_area:
+                        cv2.drawContours(display_frame, contours, idx, (0, 0, 255))
+                        M = cv2.moments(contour)
+                        cx = int(M['m10'] / M['m00'])
+                        cy = int(M['m01'] / M['m00'])
+                        cv2.circle(display_frame, (cx, cy), 2, (0, 0, 255), -1)
+                        centers.append((cx, cy))
+
+            for idx in range(len(self.choice)):
+                center_idx = np.argmin(list(map(self.l2distance, [(self.choice[idx], center) for center in centers])))
+                # print(map(self.l2distance, [(pos, center) for center in centers]))
+                self.choice[idx] = centers[center_idx]
+                cv2.circle(display_frame, self.choice[idx], 5, tuple(self.colors[idx]), -1)
+                display_frame = cv2.putText(display_frame, str(idx), self.choice[idx],
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.colors[idx], 2)
+
+            display_frame = cv2.putText(display_frame, 'Press Enter To Start Tracking...', (50, 50),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            cv2.imshow('choose nematode', display_frame)
+            k = cv2.waitKey(30) & 0xff
+            if k in [27, 13, 32]:
+                self.chosen_nematode_tot_distance = np.zeros(len(self.choice))
+                break
+
+    def track_nematode(self):
+        output_dir, name = os.path.split(self.filename)
+        output_dir = os.path.join(output_dir, 'output')
+        wri = cv2.VideoWriter(
+            os.path.join(output_dir, name),
+            cv2.VideoWriter_fourcc('F', 'M', 'P', '4'),
+            self.video_reader.fps,
+            self.video_reader.target_shape,
+        )
+        path_frame = np.zeros_like(self.first_frame)
+        for i in range(1, self.video_reader.frame_count):
+            frame = self.video_reader.read()
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            ret, gray_frame = cv2.threshold(gray_frame, self.threshold, 255, cv2.THRESH_BINARY_INV)
+            display_frame = frame.copy()
+            centers = []
+            _, contours, _ = cv2.findContours(gray_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                for idx, contour in enumerate(contours):
+                    if self.min_area < cv2.contourArea(contour) < self.max_area:
+                        cv2.drawContours(display_frame, contours, idx, (0, 0, 255))
+                        M = cv2.moments(contour)
+                        cx = int(M['m10'] / M['m00'])
+                        cy = int(M['m01'] / M['m00'])
+                        cv2.circle(display_frame, (cx, cy), 2, (0, 0, 255), -1)
+                        centers.append((cx, cy))
+
+            data_point = []
+            for idx in range(len(self.choice)):
+                center_idx = np.argmin(list(map(self.l2distance, [(self.choice[idx], center) for center in centers])))
+                distance = self.l2distance((self.choice[idx], centers[center_idx]))
+                self.chosen_nematode_tot_distance[idx] += distance
+                if distance < max(self.video_reader.width, self.video_reader.height)/10:
+                    self.choice[idx] = centers[center_idx]
+                cv2.circle(path_frame, self.choice[idx], 2, self.colors[idx], -1)
+                data_point.append((
+                    self.choice[idx][0],
+                    self.choice[idx][1],
+                    distance,
+                    self.chosen_nematode_tot_distance[idx],
+                ))
+
+                cv2.circle(display_frame, self.choice[idx], 5, self.colors[idx], -1)
+                display_frame = cv2.putText(display_frame, str(idx), self.choice[idx],
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.colors[idx], 2)
+
+            self.data.append(data_point)
+
+            display_frame = cv2.bitwise_or(path_frame, display_frame, display_frame)
+            cv2.imshow('choose nematode', display_frame)
+            wri.write(display_frame)
+            k = cv2.waitKey(30) & 0xff
+            if k in [27, 13, 32]:
+                break
+
+        data = np.array(self.data)
+        data = data.reshape((len(data), -1))
+        columns = []
+        for i in range(len(self.choice)):
+            columns.append('n%dx' % i)
+            columns.append('n%dy' % i)
+            columns.append('n%dspeed' % i)
+            columns.append('n%ddistance' % i)
+        df = pd.DataFrame(data=data, columns=columns)
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
+        df.to_csv(os.path.join(output_dir, name + '.csv'))
+        wri.release()
+
+
+if __name__ == "__main__":
+    nematode_tracker = NematodeTracker(filename='videos/capture-0056.mp4')
+    nematode_tracker.init_threshold()
+    nematode_tracker.choose_nematode()
+    nematode_tracker.track_nematode()
+

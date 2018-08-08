@@ -10,7 +10,7 @@ class VideoReader:
         self.width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.frame_count = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        self.frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         self.target_shape = (int(self.width * resize_ratio), int(self.height * resize_ratio))
 
