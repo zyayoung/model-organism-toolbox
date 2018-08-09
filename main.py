@@ -4,7 +4,7 @@ import os
 from nematoda import NematodeTracker, NematodaMovementDetector
 
 
-def live_nematode_helper():
+def live_nematode_counter():
     file_list = list(tk.filedialog.askopenfilenames())
 
     for file in file_list:
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     window.title('Model Organism Toolbox')
     L1 = tk.Label(window, text='Model Organism Toolboxn\nPlease choose an application below!')
     L1.pack()
-    B1 = tk.Button(window, text='Live nematoda helper', command=live_nematode_helper, width=25)
+    B1 = tk.Button(window, text='Live nematoda counter', command=live_nematode_counter, width=25)
     B1.pack()
     B2 = tk.Button(window, text='Nematoda click & track', command=click_and_track, width=25)
     B2.pack()
