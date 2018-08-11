@@ -1,0 +1,1 @@
+pyinstaller -i mot.ico --add-binary binary\opencv_ffmpeg341.dll;. --add-binary binary\opencv_ffmpeg341_64.dll;. --hidden-import pandas._libs.tslibs.timedeltas --hidden-import pandas._libs.tslibs.np_datetime --hidden-import pandas._libs.tslibs.nattype --hidden-import pandas._libs.skiplist main.py

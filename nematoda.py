@@ -216,6 +216,7 @@ class NematodeTracker:
     def find_nematode(self, frame):
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         ret, gray_frame = cv2.threshold(gray_frame, self.threshold, 255, cv2.THRESH_BINARY_INV)
+        # TODO: Close operation?
         display_frame = frame.copy()
         centers = []
         _, contours, _ = cv2.findContours(gray_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -294,6 +295,8 @@ class NematodeTracker:
     def track_nematode(self):
         output_dir, name = os.path.split(self.filename)
         output_dir = os.path.join(output_dir, 'output')
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
         wri = cv2.VideoWriter(
             os.path.join(output_dir, name),
             cv2.VideoWriter_fourcc('F', 'M', 'P', '4'),
@@ -353,10 +356,9 @@ class NematodeTracker:
             columns.append('n%dspeed' % i)
             columns.append('n%ddistance' % i)
         df = pd.DataFrame(data=data, columns=columns)
-        if not os.path.exists(output_dir):
-            os.mkdir(output_dir)
         df.to_csv(os.path.join(output_dir, name + '.csv'))
         wri.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
