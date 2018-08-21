@@ -5,6 +5,9 @@ A set of tools that help animal behavior research.
 ## Tools in this project
 
 - live nematoda counter
+- nematoda click & track
+
+![ncat](https://raw.githubusercontent.com/zyayoung/image-repository/master/capture-0001_.gif)
 
 _Todo: Create more tools_
 
@@ -23,7 +26,7 @@ Download the latest version of Miniconda: [Windows-x86_64](https://mirrors.tuna.
 Run the following command in cmd or PowerShell.
 
 ```bash
-conda install opencv
+conda install opencv pandas
 ```
 
 ### Step 3: 
@@ -31,5 +34,5 @@ conda install opencv
 Run 
 ```bash
 cd [your_dictionary/]model-organism-toolbox
-python live_nematoda_counter.py
+python main.py
 ```
