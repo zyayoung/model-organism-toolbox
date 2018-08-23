@@ -7,12 +7,12 @@ class VideoReader:
         self.frame_step = frame_step
 
         self.cap = cv2.VideoCapture(filename)
-        self.width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) * resize_ratio)
+        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT) * resize_ratio)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        self.target_shape = (int(self.width * resize_ratio), int(self.height * resize_ratio))
+        self.target_shape = (self.width, self.height)
 
     def read(self):
         for _ in range(1, self.frame_step):
