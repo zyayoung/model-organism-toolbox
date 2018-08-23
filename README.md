@@ -37,3 +37,4 @@ python live_nematoda_counter.py
 ## Proformance
 
 - MacBook Pro i5 late 2011 10fps
+- AMD Ryzen 2700x 20fps (linux)
