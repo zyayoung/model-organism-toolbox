@@ -113,6 +113,7 @@ class Nematoda:
             )
 
         _time = cv2.getTickCount()
+        start_time = _time
         frame_count = np.zeros((self.max_nematoda_count,))
 
         frame = self.video_reader.read()
@@ -157,6 +158,10 @@ class Nematoda:
                 time = cv2.getTickCount()
                 print(20 / (time - _time) * cv2.getTickFrequency(), 'fps')
                 _time = time
+
+        print('%.2f' % (frame_idx * 100.0 / self.video_reader.frame_count) + '%', end=' ')
+        time = cv2.getTickCount()
+        print(frame_idx / (time - start_time) * cv2.getTickFrequency(), 'fps')
 
         if wri is not None:
             wri.release()

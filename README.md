@@ -33,3 +33,7 @@ Run
 cd [your_dictionary/]model-organism-toolbox
 python live_nematoda_counter.py
 ```
+
+## Proformance
+
+- MacBook Pro i5 late 2011 10fps
