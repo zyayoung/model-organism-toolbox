@@ -189,9 +189,9 @@ class NematodeTracker:
             int(self.video_reader.height * self.display_resize_ratio),
         )
 
-        self.min_area = 50  # relative area
-        self.max_area = 200
-        self.ppa = (self.video_reader.height * self.video_reader.width) / 125337600
+        self.min_area = 5  # relative area
+        self.max_area = 20
+        self.ppa = (self.video_reader.height * self.video_reader.width) / 1253376
         self.elements_resize_ratio = np.sqrt((self.video_reader.height * self.video_reader.width) / 1253376)
 
         self.data = []
@@ -264,8 +264,8 @@ class NematodeTracker:
     def choose_nematode(self):
         cv2.namedWindow('tracker')
         cv2.setMouseCallback('tracker', self.on_mouse, (self.choice, self.display_resize_ratio))
-        cv2.createTrackbar('minArea', 'tracker', self.min_area, 1000, nothing)
-        cv2.createTrackbar('maxArea', 'tracker', self.max_area, 1000, nothing)
+        cv2.createTrackbar('minArea', 'tracker', self.min_area, 100, nothing)
+        cv2.createTrackbar('maxArea', 'tracker', self.max_area, 100, nothing)
         frame = self.first_frame
         while True:
             display_frame, centers = self.find_nematode(frame)
