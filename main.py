@@ -1,7 +1,8 @@
 import tkinter as tk
 import tkinter.filedialog
 import os
-from nematoda import NematodeTracker, NematodaMovementDetector
+from NematodaMovementDetector import NematodaMovementDetector
+from NematodeTracker import NematodeTracker
 
 
 def live_nematode_counter():
