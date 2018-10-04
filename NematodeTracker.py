@@ -55,12 +55,18 @@ class NematodeTracker:
         pos1, pos2 = param
         return (pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2
 
+    def get_eccentricity(self, rect):
+        d1 = rect[1][0]
+        d2 = rect[1][1]
+        return max(d1, d2)/min(d1, d2)
+
     def find_nematode(self, frame):
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         ret, gray_frame = cv2.threshold(gray_frame, self.threshold, 255, cv2.THRESH_BINARY_INV)
         # TODO: Close operation?
         display_frame = frame.copy()
         centers = []
+        eccentricities = []
         _, contours, _ = cv2.findContours(gray_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             for idx, contour in enumerate(contours):
@@ -71,8 +77,11 @@ class NematodeTracker:
                     cy = int(m['m01'] / m['m00'])
                     cv2.circle(display_frame, (cx, cy), 2, (0, 255, 0), -1)
                     centers.append((cx, cy))
+                    ellipse = cv2.fitEllipseDirect(contour)
+                    display_frame = cv2.ellipse(display_frame, ellipse, (0, 255, 0), 2)
+                    eccentricities.append(self.get_eccentricity(ellipse))
 
-        return display_frame, centers
+        return display_frame, centers, eccentricities
 
     def init_threshold(self):
         cv2.namedWindow('tracker')
@@ -110,7 +119,7 @@ class NematodeTracker:
         while True:
             self.min_area = cv2.getTrackbarPos('minArea', 'tracker') ** 2
             self.max_area = cv2.getTrackbarPos('maxArea', 'tracker') ** 2
-            display_frame, centers = self.find_nematode(frame)
+            display_frame, centers, eccentricities = self.find_nematode(frame)
             for idx in range(len(self.choice)):
                 center_idx = np.argmin(list(map(self.l2distance, [(self.choice[idx], center) for center in centers])))
                 self.choice[idx] = centers[center_idx]
@@ -148,7 +157,7 @@ class NematodeTracker:
         path_layer = np.zeros_like(self.first_frame)
         for i in range(1, self.video_reader.frame_count):
             text_layer = np.zeros_like(self.first_frame)
-            display_frame, centers = self.find_nematode(self.video_reader.read())
+            display_frame, centers, eccentricities = self.find_nematode(self.video_reader.read())
 
             data_point = []
             for idx in range(len(self.choice)):
@@ -161,7 +170,7 @@ class NematodeTracker:
                                -1)
                     cv2.putText(
                         text_layer,
-                        '%d %d' % (idx, self.chosen_nematode_tot_distance[idx]),
+                        '%d %d %.2f' % (idx, self.chosen_nematode_tot_distance[idx], eccentricities[center_idx]),
                         self.choice[idx],
                         cv2.FONT_HERSHEY_SIMPLEX,
                         self.elements_resize_ratio,
@@ -186,6 +195,7 @@ class NematodeTracker:
                     self.choice[idx][1],
                     distance,
                     self.chosen_nematode_tot_distance[idx],
+                    eccentricities[center_idx],
                 ))
 
             self.data.append(data_point)
@@ -209,6 +219,7 @@ class NematodeTracker:
             columns.append('n%dy' % i)
             columns.append('n%dspeed' % i)
             columns.append('n%ddistance' % i)
+            columns.append('n%deccentricity' % i)
         df = pd.DataFrame(data=data, columns=columns)
         df.to_csv(os.path.join(output_dir, name + '.csv'))
         wri.release()
