@@ -14,7 +14,7 @@ class NematodeTracker:
         self.filename = filename
         self.video_reader = VideoReader(filename)
         self.first_frame = self.video_reader.read()
-        self.choice = []
+        self.chosen_nematode_pos = []
         self.nematode_count = 0
         self.chosen_nematode_tot_distance = []
         self.colors = np.random.uniform(0, 255, (100, 3))
@@ -53,9 +53,15 @@ class NematodeTracker:
     @staticmethod
     def l2distance(param):
         pos1, pos2 = param
+        return np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
+
+    @staticmethod
+    def l2distance2(param):
+        pos1, pos2 = param
         return (pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2
 
-    def get_eccentricity(self, rect):
+    @staticmethod
+    def get_eccentricity(rect):
         d1 = rect[1][0]
         d2 = rect[1][1]
         return max(d1, d2)/min(d1, d2)
@@ -63,7 +69,6 @@ class NematodeTracker:
     def find_nematode(self, frame):
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         ret, gray_frame = cv2.threshold(gray_frame, self.threshold, 255, cv2.THRESH_BINARY_INV)
-        # TODO: Close operation?
         display_frame = frame.copy()
         centers = []
         eccentricities = []
@@ -112,7 +117,7 @@ class NematodeTracker:
 
     def choose_nematode(self):
         cv2.namedWindow('tracker')
-        cv2.setMouseCallback('tracker', self.on_mouse, (self.choice, self.display_resize_ratio))
+        cv2.setMouseCallback('tracker', self.on_mouse, (self.chosen_nematode_pos, self.display_resize_ratio))
         cv2.createTrackbar('minArea', 'tracker', self.min_area, 100, nothing)
         cv2.createTrackbar('maxArea', 'tracker', self.max_area, 100, nothing)
         frame = self.first_frame
@@ -120,26 +125,36 @@ class NematodeTracker:
             self.min_area = cv2.getTrackbarPos('minArea', 'tracker') ** 2
             self.max_area = cv2.getTrackbarPos('maxArea', 'tracker') ** 2
             display_frame, centers, eccentricities = self.find_nematode(frame)
-            for idx in range(len(self.choice)):
-                center_idx = np.argmin(list(map(self.l2distance, [(self.choice[idx], center) for center in centers])))
-                self.choice[idx] = centers[center_idx]
-                cv2.circle(display_frame, self.choice[idx], int(5*self.elements_resize_ratio), self.colors[idx], -1)
-                cv2.putText(
-                    display_frame,
-                    str(idx),
-                    self.choice[idx],
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    self.elements_resize_ratio,
-                    self.colors[idx],
-                    int(2 * self.elements_resize_ratio),
-                )
+            if centers:
+                for chosen_nematode_pos_idx in range(len(self.chosen_nematode_pos)):
+                    center_idx = int(np.argmin(list(map(
+                        self.l2distance2,
+                        [(self.chosen_nematode_pos[chosen_nematode_pos_idx], center) for center in centers],
+                    ))))
+                    self.chosen_nematode_pos[chosen_nematode_pos_idx] = centers[center_idx]
+                    cv2.circle(
+                        display_frame,
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
+                        int(5 * self.elements_resize_ratio),
+                        self.colors[chosen_nematode_pos_idx],
+                        -1
+                    )
+                    cv2.putText(
+                        display_frame,
+                        str(chosen_nematode_pos_idx),
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        self.elements_resize_ratio,
+                        self.colors[chosen_nematode_pos_idx],
+                        int(2 * self.elements_resize_ratio),
+                    )
 
             cv2.putText(display_frame, 'Press Enter To Start Tracking...', (50, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             cv2.imshow('tracker', cv2.resize(display_frame, self.target_display_shape, interpolation=cv2.INTER_AREA))
             k = cv2.waitKey(30) & 0xff
             if k in [27, 13, 32]:
-                self.chosen_nematode_tot_distance = np.zeros(len(self.choice))
+                self.chosen_nematode_tot_distance = np.zeros(len(self.chosen_nematode_pos))
                 cv2.destroyWindow('tracker')
                 break
 
@@ -157,24 +172,51 @@ class NematodeTracker:
         path_layer = np.zeros_like(self.first_frame)
         for i in range(1, self.video_reader.frame_count):
             text_layer = np.zeros_like(self.first_frame)
-            display_frame, centers, eccentricities = self.find_nematode(self.video_reader.read())
+            display_frame, cur_centers, eccentricities = self.find_nematode(self.video_reader.read())
 
             data_point = []
-            for idx in range(len(self.choice)):
-                center_idx = np.argmin(list(map(self.l2distance, [(self.choice[idx], center) for center in centers])))
-                distance = np.sqrt(self.l2distance((self.choice[idx], centers[center_idx])))
+            for chosen_nematode_pos_idx in range(len(self.chosen_nematode_pos)):
+                if not cur_centers:
+                    distance = np.infty
+                    cur_center_idx = -1
+                else:
+                    cur_center_idx = int(np.argmin(list(map(
+                        self.l2distance2,
+                        [(self.chosen_nematode_pos[chosen_nematode_pos_idx], cur_center) for cur_center in cur_centers],
+                    ))))
+                    distance = self.l2distance((
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
+                        cur_centers[cur_center_idx],
+                    ))
+
+                # display and record data according to whether the selected nematode is tracked correctly
                 if distance < max(self.video_reader.width, self.video_reader.height)/10:
-                    self.choice[idx] = centers[center_idx]
-                    cv2.circle(path_layer, self.choice[idx], 2, self.colors[idx], -1)
-                    cv2.circle(display_frame, self.choice[idx], int(5 * self.elements_resize_ratio), self.colors[idx],
-                               -1)
+                    self.chosen_nematode_pos[chosen_nematode_pos_idx] = cur_centers[cur_center_idx]
+                    cv2.circle(
+                        path_layer,
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
+                        2,
+                        self.colors[chosen_nematode_pos_idx],
+                        -1
+                    )
+                    cv2.circle(
+                        display_frame,
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
+                        int(5 * self.elements_resize_ratio),
+                        self.colors[chosen_nematode_pos_idx],
+                        -1
+                    )
                     cv2.putText(
                         text_layer,
-                        '%d %d %.2f' % (idx, self.chosen_nematode_tot_distance[idx], eccentricities[center_idx]),
-                        self.choice[idx],
+                        '%d %d %.2f' % (
+                            chosen_nematode_pos_idx,
+                            self.chosen_nematode_tot_distance[chosen_nematode_pos_idx],
+                            eccentricities[cur_center_idx]
+                        ),
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
                         cv2.FONT_HERSHEY_SIMPLEX,
                         self.elements_resize_ratio,
-                        self.colors[idx],
+                        self.colors[chosen_nematode_pos_idx],
                         int(2 * self.elements_resize_ratio),
                     )
                 else:
@@ -182,39 +224,40 @@ class NematodeTracker:
                     cv2.putText(
                         path_layer,
                         '?',
-                        self.choice[idx],
+                        self.chosen_nematode_pos[chosen_nematode_pos_idx],
                         cv2.FONT_HERSHEY_SIMPLEX,
                         self.elements_resize_ratio,
-                        self.colors[idx],
+                        self.colors[chosen_nematode_pos_idx],
                         int(2 * self.elements_resize_ratio),
                     )
 
-                self.chosen_nematode_tot_distance[idx] += distance
+                self.chosen_nematode_tot_distance[chosen_nematode_pos_idx] += distance
                 data_point.append((
-                    self.choice[idx][0],
-                    self.choice[idx][1],
+                    self.chosen_nematode_pos[chosen_nematode_pos_idx][0],
+                    self.chosen_nematode_pos[chosen_nematode_pos_idx][1],
                     distance,
-                    self.chosen_nematode_tot_distance[idx],
-                    eccentricities[center_idx],
+                    self.chosen_nematode_tot_distance[chosen_nematode_pos_idx],
+                    eccentricities[cur_center_idx],
                 ))
-
             self.data.append(data_point)
 
+            # combine information layer with the original video
             display_frame = cv2.bitwise_xor(display_frame, path_layer, display_frame)
             display_frame = cv2.bitwise_xor(display_frame, text_layer, display_frame)
-
-            cv2.putText(display_frame, 'Total nematode cnt: %d' % len(self.choice), (50, 50),
+            cv2.putText(display_frame, 'Total nematode cnt: %d' % len(self.chosen_nematode_pos), (50, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
             cv2.imshow('tracker', cv2.resize(display_frame, self.target_display_shape))
             wri.write(display_frame)
             k = cv2.waitKey(1) & 0xff
             if k in [27, 13, 32]:
                 break
 
+        # save recorded data
         data = np.array(self.data)
         data = data.reshape((len(data), -1))
         columns = []
-        for i in range(len(self.choice)):
+        for i in range(len(self.chosen_nematode_pos)):
             columns.append('n%dx' % i)
             columns.append('n%dy' % i)
             columns.append('n%dspeed' % i)
