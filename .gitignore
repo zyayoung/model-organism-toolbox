@@ -1,3 +1,10 @@
 
 __pycache__/
+.idea/
+dist/
+videos/
+build/
+binary/
+*.spec
+*.ico
 .DS_Store
