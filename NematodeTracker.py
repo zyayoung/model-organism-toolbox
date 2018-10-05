@@ -64,7 +64,9 @@ class NematodeTracker:
     def get_eccentricity(rect):
         d1 = rect[1][0]
         d2 = rect[1][1]
-        return max(d1, d2)/min(d1, d2)
+        dmax = max(d1, d2)
+        dmin = min(d1, d2)
+        return np.sqrt(dmax**2-dmin**2)/dmax
 
     def find_nematode(self, frame):
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -122,8 +124,8 @@ class NematodeTracker:
         cv2.createTrackbar('maxArea', 'tracker', self.max_area, 100, nothing)
         frame = self.first_frame
         while True:
-            self.min_area = cv2.getTrackbarPos('minArea', 'tracker') ** 2
-            self.max_area = cv2.getTrackbarPos('maxArea', 'tracker') ** 2
+            self.min_area = max(5, cv2.getTrackbarPos('minArea', 'tracker') ** 2)
+            self.max_area = max(5, cv2.getTrackbarPos('maxArea', 'tracker') ** 2)
             display_frame, centers, eccentricities = self.find_nematode(frame)
             if centers:
                 for chosen_nematode_pos_idx in range(len(self.chosen_nematode_pos)):
